@@ -4,7 +4,6 @@ import React, { useCallback, useState } from 'react';
 import { Upload, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface FileUploaderProps {
   onFileSelect: (file: File) => Promise<void>;
@@ -129,10 +128,10 @@ export function FileUploader({ onFileSelect, isLoading = false }: FileUploaderPr
         </div>
 
         {error && (
-          <Alert variant="destructive" className="mt-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          <div className="mt-4 p-4 rounded-lg bg-destructive/10 border border-destructive/50 flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
         )}
 
         <div className="mt-6 p-4 bg-muted rounded-lg">
