@@ -81,10 +81,19 @@ export function computePeriodogram(
 ): PeriodicityData[] {
   const n = flux.length;
   
+  if (n < 2) {
+    return [];
+  }
+
   // Normalize time to start from 0
   const minTime = Math.min(...time);
   const normalizedTime = time.map(t => t - minTime);
   const timeSpan = normalizedTime[n - 1] - normalizedTime[0];
+
+  // Avoid division by zero in frequency calculation
+  if (timeSpan === 0 || !isFinite(timeSpan)) {
+    return [];
+  }
 
   // Compute FFT
   const fft = computeFFT(flux);
@@ -94,7 +103,8 @@ export function computePeriodogram(
   for (let i = 0; i < fft.real.length / 2; i++) {
     const real = fft.real[i];
     const imag = fft.imag[i];
-    power.push(real * real + imag * imag);
+    const p = real * real + imag * imag;
+    power.push(isFinite(p) ? p : 0);
   }
 
   // Convert indices to frequencies (cycles per day)
@@ -103,11 +113,13 @@ export function computePeriodogram(
 
   for (let i = 1; i < power.length; i++) {
     const frequency = (i / timeSpan) * (24 * 60 * 60); // Convert to cycles per day
-    frequencies.push(frequency);
-    periodogram.push({
-      frequency,
-      power: power[i],
-    });
+    if (isFinite(frequency)) {
+      frequencies.push(frequency);
+      periodogram.push({
+        frequency,
+        power: power[i],
+      });
+    }
   }
 
   return periodogram;
@@ -186,20 +198,31 @@ export function detectTransitDepth(
   period: number,
   time: number[]
 ): number {
+  if (flux.length === 0 || period <= 0) {
+    return 0;
+  }
+
   const minTime = Math.min(...time);
   const normalizedTime = time.map(t => t - minTime);
 
   // Calculate mean flux
   const baseMeanFlux = flux.reduce((a, b) => a + b) / flux.length;
 
+  // Avoid division by zero
+  if (baseMeanFlux === 0 || !isFinite(baseMeanFlux)) {
+    return 0;
+  }
+
   // Divide light curve into bins by phase
-  const numBins = Math.ceil(period / 2); // At least 2 bins per period
+  const numBins = Math.max(2, Math.ceil(period / 2)); // At least 2 bins per period
   const binnedFlux: number[][] = Array.from({ length: numBins }, () => []);
 
   for (let i = 0; i < flux.length; i++) {
-    const phase = (normalizedTime[i] % period) / period;
-    const binIndex = Math.floor(phase * numBins) % numBins;
-    binnedFlux[binIndex].push(flux[i]);
+    if (period > 0 && isFinite(period)) {
+      const phase = (normalizedTime[i] % period) / period;
+      const binIndex = Math.floor(phase * numBins) % numBins;
+      binnedFlux[binIndex].push(flux[i]);
+    }
   }
 
   // Find minimum flux bin (most likely transit)
@@ -214,5 +237,5 @@ export function detectTransitDepth(
   // Transit depth in parts per million
   const depth = (baseMeanFlux - minBinFlux) / baseMeanFlux * 1e6;
 
-  return Math.max(0, depth);
+  return Math.max(0, depth) && isFinite(depth) ? Math.max(0, depth) : 0;
 }

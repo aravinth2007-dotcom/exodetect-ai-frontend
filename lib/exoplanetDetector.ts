@@ -148,7 +148,7 @@ export async function detectExoplanet(
       orbitalPeriod: isExoplanet ? bestDetection.orbitalPeriod : null,
       transitDepth: isExoplanet ? bestDetection.transitDepth : null,
       snr: isExoplanet ? bestDetection.snr : null,
-      dominantFrequency: isExoplanet ? 1 / bestDetection.orbitalPeriod : null,
+      dominantFrequency: isExoplanet && bestDetection.orbitalPeriod > 0 ? 1 / bestDetection.orbitalPeriod : null,
       processedData: {
         original: originalData,
         normalized: normalized,
