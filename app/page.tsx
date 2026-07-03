@@ -17,7 +17,16 @@ export default function Home() {
     setIsLoading(true);
     try {
       const fileContent = await file.text();
+      
+      if (!fileContent || fileContent.trim().length === 0) {
+        throw new Error('CSV file is empty');
+      }
+
       const result = await detectExoplanet(fileContent);
+
+      if (!result) {
+        throw new Error('Failed to analyze data');
+      }
 
       // Store result in sessionStorage for results page
       sessionStorage.setItem('detectionResult', JSON.stringify(result));
@@ -25,10 +34,10 @@ export default function Home() {
       // Navigate to results page
       router.push('/results');
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An error occurred';
-      alert(`Error: ${errorMessage}`);
-    } finally {
       setIsLoading(false);
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred. Please check your CSV file format.';
+      console.error('[v0] Error:', error);
+      alert(`Error: ${errorMessage}`);
     }
   };
 

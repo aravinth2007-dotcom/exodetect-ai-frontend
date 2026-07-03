@@ -154,6 +154,10 @@ export function foldLightCurve(
   data: LightCurveData,
   period: number
 ): FoldedLightCurveData {
+  if (!data || !data.time || !data.flux || data.time.length === 0 || period <= 0) {
+    return { phase: [], flux: [] };
+  }
+
   const minTime = Math.min(...data.time);
   const normalizedTime = data.time.map(t => t - minTime);
 
@@ -161,9 +165,17 @@ export function foldLightCurve(
   const flux: number[] = [];
 
   for (let i = 0; i < normalizedTime.length; i++) {
-    const p = (normalizedTime[i] % period) / period;
-    phase.push(p);
-    flux.push(data.flux[i]);
+    if (period > 0 && isFinite(period)) {
+      const p = (normalizedTime[i] % period) / period;
+      if (isFinite(p) && p >= 0 && p <= 1) {
+        phase.push(p);
+        flux.push(data.flux[i]);
+      }
+    }
+  }
+
+  if (phase.length === 0) {
+    return { phase: [], flux: [] };
   }
 
   // Sort by phase for better visualization
@@ -181,16 +193,27 @@ export function calculateSignalToNoise(
   flux: number[],
   transitDepth: number
 ): number {
+  if (!flux || flux.length === 0) {
+    return 0;
+  }
+
   // Estimate noise as RMS of flux deviations
   const mean = flux.reduce((a, b) => a + b) / flux.length;
+  
+  if (!isFinite(mean)) {
+    return 0;
+  }
+
   const variance =
     flux.reduce((a, f) => a + Math.pow(f - mean, 2), 0) / flux.length;
-  const noise = Math.sqrt(variance);
+  const noise = Math.sqrt(Math.max(0, variance));
 
-  if (noise === 0) return 0;
+  if (noise === 0 || !isFinite(noise)) return 0;
 
-  // SNR is ratio of signal (transit depth) to noise
-  return Math.abs(transitDepth) / noise;
+  const snr = Math.abs(transitDepth) / noise;
+  
+  // Return 0 for invalid SNR values
+  return isFinite(snr) ? Math.max(0, snr) : 0;
 }
 
 export function detectTransitDepth(

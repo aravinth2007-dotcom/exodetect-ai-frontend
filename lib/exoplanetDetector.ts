@@ -90,8 +90,21 @@ export async function detectExoplanet(
     };
 
     for (const peak of peaks) {
+      // Validate peak frequency
+      if (!peak.frequency || peak.frequency <= 0 || !isFinite(peak.frequency)) {
+        continue;
+      }
+
       // Convert frequency to period (in days)
-      const period = 1 / (peak.frequency / (24 * 60 * 60));
+      const frequencyInDaysInverse = peak.frequency / (24 * 60 * 60);
+      if (frequencyInDaysInverse === 0 || !isFinite(frequencyInDaysInverse)) {
+        continue;
+      }
+      const period = 1 / frequencyInDaysInverse;
+
+      if (!isFinite(period) || period <= 0) {
+        continue;
+      }
 
       // Calculate transit depth
       const transitDepth = detectTransitDepth(
@@ -100,8 +113,16 @@ export async function detectExoplanet(
         detrended.time
       );
 
+      if (!isFinite(transitDepth) || transitDepth < 0) {
+        continue;
+      }
+
       // Calculate SNR
       const snr = calculateSignalToNoise(detrended.flux, transitDepth / 1e6);
+
+      if (!isFinite(snr) || snr < 0) {
+        continue;
+      }
 
       // Calculate confidence based on multiple factors
       const confidence = calculateConfidence(
@@ -193,25 +214,37 @@ function calculateConfidence(
 ): number {
   let confidence = 0;
 
+  // Validate inputs
+  if (!isFinite(transitDepth) || !isFinite(snr) || !isFinite(peakPower)) {
+    return 0;
+  }
+
   // Transit depth contribution (max 40%)
   if (transitDepth >= 50) {
-    confidence += Math.min(
-      40,
-      40 * Math.log(transitDepth / 50 + 1) / Math.log(11)
-    );
+    const depthFactor = Math.log(transitDepth / 50 + 1) / Math.log(11);
+    if (isFinite(depthFactor)) {
+      confidence += Math.min(40, 40 * depthFactor);
+    }
   }
 
   // SNR contribution (max 35%)
-  if (snr >= 7) {
+  if (snr >= 7 && isFinite(snr)) {
     confidence += Math.min(35, 35 * (snr / 10));
   }
 
   // Peak power contribution (max 25%)
-  const maxPower = Math.max(...periodogram.map(p => p.power));
-  if (maxPower > 0) {
-    const normalizedPower = peakPower / maxPower;
-    confidence += 25 * Math.pow(normalizedPower, 0.5);
+  if (periodogram && periodogram.length > 0) {
+    const powerValues = periodogram.map(p => p.power).filter(p => isFinite(p));
+    if (powerValues.length > 0) {
+      const maxPower = Math.max(...powerValues);
+      if (maxPower > 0 && isFinite(peakPower)) {
+        const normalizedPower = peakPower / maxPower;
+        if (isFinite(normalizedPower)) {
+          confidence += 25 * Math.pow(Math.max(0, normalizedPower), 0.5);
+        }
+      }
+    }
   }
 
-  return Math.min(100, confidence);
+  return Math.min(100, Math.max(0, confidence));
 }
